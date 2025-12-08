@@ -1,0 +1,26 @@
+{
+  "name": "gharkakhana",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Home Cooked Food Delivery Platform",
+  "scripts": {
+    "dev": "cd apps/web && npm run dev",
+    "build": "cd apps/web && npm run build",
+    "start": "cd apps/web && npm start",
+    "deploy:infra": "cd infrastructure/cdk && cdk deploy --all",
+    "deploy:api": "cd packages/api && npm run deploy",
+    "test": "npm run test --workspaces",
+    "lint": "npm run lint --workspaces"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "infrastructure/*"
+  ],
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
