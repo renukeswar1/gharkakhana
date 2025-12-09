@@ -7,15 +7,14 @@
     "dev": "cd apps/web && npm run dev",
     "build": "cd apps/web && npm run build",
     "start": "cd apps/web && npm start",
-    "deploy:infra": "cd infrastructure/cdk && cdk deploy --all",
+    "deploy:infra": "cd infrastructure/cdk && npx cdk deploy --all",
     "deploy:api": "cd packages/api && npm run deploy",
     "test": "npm run test --workspaces",
     "lint": "npm run lint --workspaces"
   },
   "workspaces": [
     "apps/*",
-    "packages/*",
-    "infrastructure/*"
+    "packages/*"
   ],
   "devDependencies": {
     "typescript": "^5.3.0"

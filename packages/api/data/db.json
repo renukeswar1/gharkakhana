@@ -1,0 +1,62 @@
+{
+  "users": {
+    "ec216cb0-b734-4ba8-ad98-8d961bc1036e": {
+      "userId": "ec216cb0-b734-4ba8-ad98-8d961bc1036e",
+      "email": "renu@gmail.com",
+      "phone": "+919611906060",
+      "name": "renu",
+      "role": "CHEF",
+      "password": "$2a$10$vHhA2B3i.GfZLHsWX53bOOFdF23FsC.3UA5odlgPrflYhfSRNdMP.",
+      "addresses": [],
+      "createdAt": "2025-12-08T16:31:58.601Z",
+      "updatedAt": "2025-12-08T16:31:58.601Z",
+      "isVerified": true
+    }
+  },
+  "chefs": {
+    "205f206c-bfde-4ff6-9650-b92808474234": {
+      "chefId": "205f206c-bfde-4ff6-9650-b92808474234",
+      "userId": "ec216cb0-b734-4ba8-ad98-8d961bc1036e",
+      "email": "renu@gmail.com",
+      "phone": "+919611906060",
+      "name": "renu",
+      "businessName": "manus",
+      "bio": "",
+      "specialties": [],
+      "cuisines": [
+        "Kerala",
+        "Tamil",
+        "Hyderabadi"
+      ],
+      "address": {
+        "line1": "36, 1 sta a cross",
+        "line2": "rmv 2n stage",
+        "city": "Hyderabad",
+        "state": "Telangana",
+        "pincode": "560054",
+        "latitude": 13.0383872,
+        "longitude": 77.5684096,
+        "geohash": "tdr4jje"
+      },
+      "serviceRadius": 5,
+      "verification": {
+        "aadhaarNumber": "123412",
+        "panNumber": "DA",
+        "fssaiNumber": "",
+        "isVerified": true,
+        "documents": []
+      },
+      "rating": 0,
+      "totalReviews": 0,
+      "totalOrders": 0,
+      "status": "APPROVED",
+      "isAvailable": true,
+      "workingHours": {},
+      "createdAt": "2025-12-08T16:31:58.670Z",
+      "updatedAt": "2025-12-08T16:37:43.227Z"
+    }
+  },
+  "menus": {},
+  "orders": {},
+  "reviews": {}
+}

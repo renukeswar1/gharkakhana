@@ -50,7 +50,7 @@ export class ApiStack extends cdk.Stack {
 
     // Lambda layer for shared code
     const sharedLayer = new lambda.LayerVersion(this, 'SharedLayer', {
-      code: lambda.Code.fromAsset(path.join(__dirname, '../../../packages/shared')),
+      code: lambda.Code.fromAsset(path.join(__dirname, '../../../../packages/shared')),
       compatibleRuntimes: [lambda.Runtime.NODEJS_18_X],
       description: 'Shared utilities and types',
     })
@@ -98,16 +98,18 @@ export class ApiStack extends cdk.Stack {
         functionName: `${projectName}-${name}-${environment}`,
         runtime: lambda.Runtime.NODEJS_18_X,
         handler: 'handler',
-        entry: path.join(__dirname, `../../../packages/api/src/handlers/${handler}.ts`),
+        entry: path.join(__dirname, `../../../../packages/api/src/handlers/${handler}.ts`),
         environment: lambdaEnv,
         layers: [sharedLayer],
         timeout: cdk.Duration.seconds(30),
         memorySize: 512,
         logRetention: logs.RetentionDays.ONE_WEEK,
         bundling: {
-          externalModules: ['aws-sdk'],
+          externalModules: ['aws-sdk', '@aws-sdk/*'],
           minify: true,
           sourceMap: true,
+          // Use local esbuild instead of Docker
+          forceDockerBundling: false,
         },
       })
 

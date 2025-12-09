@@ -3,12 +3,15 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useStore } from '@/store/useStore'
+import { apiClient } from '@/lib/api-client'
 
 export default function LoginPage() {
   const router = useRouter()
+  const { setUser, setToken } = useStore()
   const [loginType, setLoginType] = useState<'customer' | 'chef'>('customer')
   const [formData, setFormData] = useState({
-    email: '',
+    emailOrPhone: '',
     password: '',
   })
   const [loading, setLoading] = useState(false)
@@ -20,16 +23,39 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      // Mock login - replace with actual API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      const response = await apiClient.login(formData.emailOrPhone, formData.password)
+
+      if (!response.success) {
+        throw new Error(response.error?.message || 'Login failed')
+      }
+
+      // Save token to localStorage and store
+      localStorage.setItem('token', response.data.token)
+      setToken(response.data.token)
       
-      if (loginType === 'chef') {
+      // Set user in store
+      setUser({
+        userId: response.data.userId,
+        email: response.data.email,
+        name: response.data.name,
+        phone: response.data.phone || '',
+        role: response.data.role
+      })
+      
+      // Redirect based on role and login type
+      if (response.data.chef && loginType === 'chef') {
+        if (response.data.chef.status === 'APPROVED') {
+          router.push('/chef/dashboard')
+        } else {
+          router.push('/chef/verification-pending')
+        }
+      } else if (response.data.role === 'CHEF' && loginType === 'chef') {
         router.push('/chef/dashboard')
       } else {
-        router.push('/search')
+        router.push('/account')
       }
-    } catch (err) {
-      setError('Invalid email or password')
+    } catch (err: any) {
+      setError(err.message || 'Invalid email/phone or password')
     } finally {
       setLoading(false)
     }
@@ -81,16 +107,17 @@ export default function LoginPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email or Phone
+                Email or Phone Number
               </label>
               <input
                 type="text"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                value={formData.emailOrPhone}
+                onChange={(e) => setFormData({ ...formData, emailOrPhone: e.target.value })}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                placeholder="Enter your email or phone"
+                placeholder="Enter email or 10-digit phone number"
                 required
               />
+              <p className="text-xs text-gray-500 mt-1">Example: renu@gmail.com or 9611906060</p>
             </div>
 
             <div>

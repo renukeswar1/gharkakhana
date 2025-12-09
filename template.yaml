@@ -1,0 +1,257 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: GharKaKhana - Home Cooked Food Delivery Platform
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: nodejs20.x
+    MemorySize: 256
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref DynamoDBTable
+        JWT_SECRET: !Ref JWTSecret
+    Tracing: Active
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+  JWTSecret:
+    Type: String
+    NoEcho: true
+    Default: gharkakhana-jwt-secret-change-in-production
+
+Resources:
+  # ==================== DynamoDB Table ====================
+  DynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub gharkakhana-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+        - AttributeName: GSI2PK
+          AttributeType: S
+        - AttributeName: GSI2SK
+          AttributeType: S
+        - AttributeName: GSI3PK
+          AttributeType: S
+        - AttributeName: GSI3SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        # GSI1: For querying by email/phone
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        # GSI2: For geolocation-based queries (chefs by geohash)
+        - IndexName: GSI2
+          KeySchema:
+            - AttributeName: GSI2PK
+              KeyType: HASH
+            - AttributeName: GSI2SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        # GSI3: For orders by status, menus by category, etc.
+        - IndexName: GSI3
+          KeySchema:
+            - AttributeName: GSI3PK
+              KeyType: HASH
+            - AttributeName: GSI3SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+
+  # ==================== API Gateway ====================
+  ApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub gharkakhana-api-${Environment}
+      StageName: !Ref Environment
+      Cors:
+        AllowMethods: "'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key'"
+        AllowOrigin: "'*'"
+      Auth:
+        DefaultAuthorizer: NONE
+
+  # ==================== Lambda Functions ====================
+  
+  # Auth Function
+  AuthFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub gharkakhana-auth-${Environment}
+      CodeUri: packages/api/dist/
+      Handler: handlers/auth-lambda.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DynamoDBTable
+      Events:
+        Register:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /auth/register
+            Method: POST
+        Login:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /auth/login
+            Method: POST
+        Me:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /auth/me
+            Method: GET
+
+  # Chefs Function
+  ChefsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub gharkakhana-chefs-${Environment}
+      CodeUri: packages/api/dist/
+      Handler: handlers/chefs-lambda.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DynamoDBTable
+      Events:
+        Register:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /chefs/register
+            Method: POST
+        GetChef:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /chefs/{chefId}
+            Method: GET
+        Search:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /chefs/search
+            Method: GET
+        MyProfile:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /chefs/me/profile
+            Method: GET
+        UpdateAvailability:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /chefs/me/availability
+            Method: PATCH
+
+  # Menus Function
+  MenusFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub gharkakhana-menus-${Environment}
+      CodeUri: packages/api/dist/
+      Handler: handlers/menus-lambda.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DynamoDBTable
+      Events:
+        Create:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /menus
+            Method: POST
+        GetByChef:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /menus/chef/{chefId}
+            Method: GET
+        Update:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /menus/{menuId}
+            Method: PUT
+        Delete:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /menus/{menuId}
+            Method: DELETE
+
+  # Orders Function
+  OrdersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub gharkakhana-orders-${Environment}
+      CodeUri: packages/api/dist/
+      Handler: handlers/orders-lambda.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DynamoDBTable
+      Events:
+        Create:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /orders
+            Method: POST
+        MyOrders:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /orders/my-orders
+            Method: GET
+        ChefOrders:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /orders/chef-orders
+            Method: GET
+        UpdateStatus:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /orders/{orderId}/status
+            Method: PATCH
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway URL
+    Value: !Sub https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${Environment}
+  DynamoDBTableName:
+    Description: DynamoDB Table Name
+    Value: !Ref DynamoDBTable
+  DynamoDBTableArn:
+    Description: DynamoDB Table ARN
+    Value: !GetAtt DynamoDBTable.Arn

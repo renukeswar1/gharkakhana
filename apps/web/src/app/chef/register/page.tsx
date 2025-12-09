@@ -4,10 +4,15 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'
+
 export default function ChefRegisterPage() {
   const router = useRouter()
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
+  const [locationLoading, setLocationLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [locationError, setLocationError] = useState('')
   
   // Form state
   const [formData, setFormData] = useState({
@@ -28,6 +33,8 @@ export default function ChefRegisterPage() {
     city: '',
     state: '',
     pincode: '',
+    latitude: 0,
+    longitude: 0,
     serviceRadius: 5,
     // Step 4 - Verification
     aadhaarNumber: '',
@@ -55,14 +62,147 @@ export default function ChefRegisterPage() {
     }))
   }
 
+  // Get current location using browser geolocation API
+  const getCurrentLocation = () => {
+    setLocationLoading(true)
+    setLocationError('')
+
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation is not supported by your browser')
+      setLocationLoading(false)
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords
+        
+        try {
+          // Update coordinates in form
+          updateFormData('latitude', latitude)
+          updateFormData('longitude', longitude)
+
+          // Try to get address from coordinates (reverse geocoding)
+          const response = await fetch(
+            `${API_URL}/geocode/reverse?lat=${latitude}&lng=${longitude}`
+          )
+          
+          if (response.ok) {
+            const data = await response.json()
+            if (data.success && data.data) {
+              setFormData(prev => ({
+                ...prev,
+                latitude,
+                longitude,
+                city: data.data.city || prev.city,
+                state: data.data.state || prev.state,
+                pincode: data.data.pincode || prev.pincode,
+              }))
+            }
+          }
+          
+          setLocationError('')
+        } catch (err) {
+          console.error('Geocoding error:', err)
+          // Still update coordinates even if reverse geocoding fails
+          updateFormData('latitude', latitude)
+          updateFormData('longitude', longitude)
+        }
+        
+        setLocationLoading(false)
+      },
+      (error) => {
+        console.error('Geolocation error:', error)
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            setLocationError('Location permission denied. Please enable location access in your browser.')
+            break
+          case error.POSITION_UNAVAILABLE:
+            setLocationError('Location information unavailable.')
+            break
+          case error.TIMEOUT:
+            setLocationError('Location request timed out.')
+            break
+          default:
+            setLocationError('An error occurred getting your location.')
+        }
+        setLocationLoading(false)
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000
+      }
+    )
+  }
+
   const handleSubmit = async () => {
     setLoading(true)
+    setError('')
+
     try {
-      // API call to register chef
-      await new Promise(resolve => setTimeout(resolve, 2000)) // Mock delay
+      // Step 1: Register user account first
+      const registerResponse = await fetch(`${API_URL}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.email,
+          phone: formData.phone.startsWith('+91') ? formData.phone : `+91${formData.phone}`,
+          password: formData.password,
+          name: formData.name,
+          role: 'CHEF'
+        })
+      })
+
+      const registerData = await registerResponse.json()
+      
+      if (!registerResponse.ok) {
+        throw new Error(registerData.error?.message || 'Registration failed')
+      }
+
+      // Save token
+      const token = registerData.data.token
+      localStorage.setItem('token', token)
+
+      // Step 2: Register as chef with the token
+      const chefResponse = await fetch(`${API_URL}/chefs/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          businessName: formData.businessName,
+          bio: formData.bio,
+          specialties: formData.specialties.split(',').map(s => s.trim()).filter(Boolean),
+          cuisines: formData.cuisines,
+          address: {
+            line1: formData.addressLine1,
+            line2: formData.addressLine2,
+            city: formData.city,
+            state: formData.state,
+            pincode: formData.pincode,
+            latitude: formData.latitude,
+            longitude: formData.longitude
+          },
+          serviceRadius: formData.serviceRadius,
+          aadhaarNumber: formData.aadhaarNumber,
+          panNumber: formData.panNumber,
+          fssaiNumber: formData.fssaiNumber
+        })
+      })
+
+      const chefData = await chefResponse.json()
+
+      if (!chefResponse.ok) {
+        throw new Error(chefData.error?.message || 'Chef registration failed')
+      }
+
+      // Success! Redirect to verification pending page
       router.push('/chef/verification-pending')
-    } catch (error) {
-      console.error('Registration error:', error)
+    } catch (err: any) {
+      console.error('Registration error:', err)
+      setError(err.message || 'Something went wrong. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -128,6 +268,18 @@ export default function ChefRegisterPage() {
 
         {/* Form Card */}
         <div className="bg-white rounded-2xl shadow-xl p-8">
+          {/* Error Display */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                {error}
+              </div>
+            </div>
+          )}
+
           {/* Step 1: Basic Info */}
           {step === 1 && (
             <div className="space-y-6">
@@ -337,14 +489,39 @@ export default function ChefRegisterPage() {
 
               <button
                 type="button"
-                className="w-full py-3 border-2 border-dashed border-orange-300 rounded-lg text-orange-600 hover:bg-orange-50 transition flex items-center justify-center gap-2"
+                onClick={getCurrentLocation}
+                disabled={locationLoading}
+                className="w-full py-3 border-2 border-dashed border-orange-300 rounded-lg text-orange-600 hover:bg-orange-50 transition flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                Use My Current Location
+                {locationLoading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
+                    Getting location...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Use My Current Location
+                  </>
+                )}
               </button>
+              
+              {/* Location Status */}
+              {formData.latitude !== 0 && formData.longitude !== 0 && (
+                <div className="flex items-center gap-2 text-green-600 text-sm">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  Location captured: {formData.latitude.toFixed(4)}, {formData.longitude.toFixed(4)}
+                </div>
+              )}
+              
+              {locationError && (
+                <div className="text-red-500 text-sm">{locationError}</div>
+              )}
             </div>
           )}
 
